@@ -1,0 +1,31 @@
+name: deteccao_placa_petri
+description: "App Flutter para detectar placas de Petri com YOLOv5 e TensorFlow Lite."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  image_picker: ^1.1.2
+  image: ^4.5.4
+
+  # TFLite oficial e compatível com Dart 3.8 / Flutter 3.32
+  tflite_flutter: ^0.11.0
+
+  # Ícones do sistema iOS (padrão Flutter)
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/models/best_yolov5_placas_quantized.tflite
