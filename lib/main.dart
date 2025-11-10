@@ -39,48 +39,107 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   File? _imageFile;
-  bool _loading = false;
-  String _status = "Nenhuma imagem processada ainda.";
+  final ImagePicker _picker = ImagePicker();
+  final tfliteHelper = TFLiteHelper();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadModel();
+  }
+
+  Future<void> _loadModel() async {
+    await tfliteHelper.loadModel();
+  }
 
   Future<void> _openCamera() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.camera);
-
+    final pickedFile = await _picker.pickImage(source: ImageSource.camera);
     if (pickedFile != null) {
-      setState(() {
-        _imageFile = File(pickedFile.path);
-        _status = "Processando...";
-        _loading = true;
-      });
+      setState(() => _imageFile = File(pickedFile.path));
+      await _runModel(_imageFile!);
+    }
+  }
 
-      final result = await widget.tflite.runInference(_imageFile!);
+  bool _isPicking = false;
 
-      setState(() {
-        _status = "Inferência concluída! Resultado: ${result.length} valores.";
-        _loading = false;
-      });
+  Future<void> _pickFromGallery() async {
+    if (_isPicking) return; // bloqueia reentradas
+    _isPicking = true;
+    try {
+      final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      if (pickedFile != null) {
+        setState(() => _imageFile = File(pickedFile.path));
+        await _runModel(_imageFile!);
+      }
+    } finally {
+      _isPicking = false;
+    }
+  }
+
+  Future<void> _runModel(File image) async {
+    print('🧠 Rodando inferência...');
+    final results = await tfliteHelper.runInference(image);
+
+    if (results.isEmpty) {
+      print('⚠️ Nenhum objeto detectado.');
+    } else {
+      print('📊 ${results.length} objetos detectados:');
+      for (final det in results.take(3)) {
+        print(
+          '→ Classe ${det['classId']} | Confiança ${(det['confidence'] * 100).toStringAsFixed(1)}%',
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Detecção de Placas")),
+      backgroundColor: Colors.purple.shade50,
+      appBar: AppBar(
+        title: const Text("Detecção de Placas"),
+        backgroundColor: Colors.purple.shade300,
+      ),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ElevatedButton.icon(
-              onPressed: _loading ? null : _openCamera,
-              icon: const Icon(Icons.camera_alt),
-              label: const Text("Abrir Câmera"),
-            ),
-            const SizedBox(height: 20),
-            if (_loading) const CircularProgressIndicator(),
-            if (_imageFile != null) Image.file(_imageFile!, height: 250),
-            const SizedBox(height: 20),
-            Text(_status, textAlign: TextAlign.center),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton.icon(
+                onPressed: _openCamera,
+                icon: const Icon(Icons.camera_alt),
+                label: const Text("Abrir Câmera"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple.shade300,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: _pickFromGallery,
+                icon: const Icon(Icons.photo_library),
+                label: const Text("Selecionar da Galeria"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple.shade200,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              _imageFile == null
+                  ? const Text("Nenhuma imagem processada ainda.")
+                  : ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: Image.file(_imageFile!, height: 300),
+                    ),
+            ],
+          ),
         ),
       ),
     );
